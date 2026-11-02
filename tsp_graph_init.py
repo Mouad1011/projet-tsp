@@ -3,12 +3,13 @@ import numpy as np
 import random
 from time import time
 import pandas as pd
-import tkinter
+from tkinter import * 
 import csv
 
 LARGEUR = 800
 HAUTEUR = 600
 NB_LIEUX = 5
+NOM_GROUPE = "GROUPE_X" # A définir
 
 ######### Fonctions diverses ##########
 def nettoyer_cle(cle, recherche):
@@ -55,7 +56,7 @@ class Graph:
         return plus_proche, distance_minimale       
 
     def charger_graph(chemin_fichier):
-        with open(f'graph_.{NB_LIEUX}csv', 'r', encoding='utf-8') as fichier:
+        with open(f'{chemin_fichier}/graph_.{NB_LIEUX}csv', 'r', encoding='utf-8') as fichier:
             return csv.DictReader(fichier)
 
     def calcul_distance_route(self, ordre):
@@ -73,10 +74,23 @@ class Graph:
         return distance
             
 
-
-
-
 ############ Class Route ############
 class Route:
     def __init__(self, ordre):
         self.ordre = ordre
+
+
+############ Class Affichage ############
+class Affichage():
+    def __init__(self, hauteur, largeur):
+        self.hauteur = hauteur
+        self.largeur = largeur
+
+    def creer_fenetre():
+        fenetre = Tk()
+        fenetre.title(NOM_GROUPE)
+        canvas = Canvas(fenetre, width=LARGEUR, height=HAUTEUR)
+        canvas.pack()
+        label = Label(fenetre, text="Texte par défaut")
+        label.pack()
+        fenetre.mainloop()
