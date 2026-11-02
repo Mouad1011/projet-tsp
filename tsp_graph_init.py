@@ -13,6 +13,7 @@ NOM_GROUPE = "GROUPE_X" # A définir
 
 ######### Fonctions diverses ##########
 def nettoyer_cle(cle, recherche):
+    ## Fonction qui retourne l'élement inverse à la recherche dans les chemins
     elements = cle.slip("-")
     return elements[1] if elements[0] == recherche else elements[0]
 
@@ -33,12 +34,12 @@ class Graph:
         self.liste_lieux = liste_lieux
         
     def calcul_matrice_cout_od(self):
-        matrice_od = {}
-        delta = 0
+        matrice_od = {} ## Dans un dictionnaire pour faire l'association chemins - distance
+        delta = 0 ## Delta permet d'éviter de relire les mêmes chemins
         for position1 in self.liste_lieux:
             delta += 1
-        for position2 in self.liste_lieux[delta:]:
-            matrice_od[f"{position1.nom}-{position2.nom}"] = Lieu.calcul_distance(position1, position2)
+        for position2 in self.liste_lieux[delta:]: ## Pour la deuxième position, il faut prendre la position qui est à l'indice suivant (donc on supprime les delta-ème indice précédente)
+            matrice_od[f"{position1.nom}-{position2.nom}"] = Lieu.calcul_distance(position1, position2) ## Format : "1-2" : 5
 
         self.matrice_od = matrice_od
 
@@ -47,8 +48,8 @@ class Graph:
         distance_minimale = float("inf")
 
         for cle, valeur in self.matrice_od.items():
-            if nom in cle:
-                if valeur < distance_minimale:
+            if nom in cle: ## Si le nom du lieu est dans la clé
+                if valeur < distance_minimale: ## On regarde sa distance
                     distance_minimale = valeur
                     plus_proche = cle
 
@@ -82,15 +83,26 @@ class Route:
 
 ############ Class Affichage ############
 class Affichage():
-    def __init__(self, hauteur, largeur):
+    def __init__(self, largeur, hauteur):
         self.hauteur = hauteur
         self.largeur = largeur
+        self.fenetre = None
+        self.label = None
+        self.canvas = None
 
-    def creer_fenetre():
-        fenetre = Tk()
-        fenetre.title(NOM_GROUPE)
-        canvas = Canvas(fenetre, width=LARGEUR, height=HAUTEUR)
-        canvas.pack()
-        label = Label(fenetre, text="Texte par défaut")
-        label.pack()
-        fenetre.mainloop()
+    def creer_fenetre(self):
+        self.fenetre = Tk()
+        self.fenetre.title(NOM_GROUPE)
+        self.canvas = Canvas(self.fenetre, width=LARGEUR, height=HAUTEUR)
+        self.canvas.pack()
+        self.label = Label(self.fenetre, text="Texte par défaut")
+        self.label.pack()
+        self.fenetre.mainloop()
+
+    def modifier_texte(self, nouveau_texte):
+        if self.label:
+            self.label.config(text=str(nouveau_texte))
+
+    ## TODO: Afficher et modifier le graphe
+    ## TODO: Gérer les colorimétries et nombre de phéromones
+    ## TODO: Gérer les différents affichages
