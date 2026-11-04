@@ -10,7 +10,7 @@ def creation_liste_lieux(csv):
 
     return lieux
 
-csv = Graph.charger_graph("C:/ISEN/5ème année/S9/DP IA/Traitement des données/Fichier_CSV", NB_LIEUX)
+csv = Graph.charger_graph("C:/ISEN/5ème année/S9/DP IA/Traitement des données/Fichier_CSV", 5)
 liste_lieux = creation_liste_lieux(csv)
 graph = Graph(liste_lieux)
 graph.calcul_matrice_cout_od()
@@ -21,3 +21,11 @@ print(distance)
 ordre = [0, 1, 2, 3, 4, 0]
 distance_total = graph.calcul_distance_route(ordre)
 print(distance_total)
+
+point_depart = '0'
+csv = Graph.charger_graph("C:/ISEN/5ème année/S9/DP IA/Traitement des données/Fichier_CSV", 5)
+liste_lieux = creation_liste_lieux(csv)
+graph = Graph(liste_lieux)
+graph.calcul_matrice_cout_od()
+route = Route([int(point_depart)], 0, point_depart, graph)
+route.heuristique_depart(5)

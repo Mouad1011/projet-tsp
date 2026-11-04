@@ -19,9 +19,9 @@ def nettoyer_cle(cle, recherche):
 ######### Classe Lieu #############
 class Lieu:
     def __init__(self, x, y, nom):
-        self.x = x
-        self.y = y
-        self.nom = nom
+        self.x = float(x)
+        self.y = float(y)
+        self.nom = str(nom)
         
     def calcul_distance(Lieu1, Lieu2):
         return float(np.hypot(Lieu1.x - Lieu2.x, Lieu1.y - Lieu2.y))
@@ -49,7 +49,7 @@ class Graph:
 
         for cle, valeur in self.matrice_od.items():
             noeud1, noeud2 = cle.split("-")
-            if str(nom) == noeud1 or str(nom) == noeud2: ## Si le nom du lieu est dans la clé
+            if (str(nom) == noeud1 or str(nom) == noeud2): ##s Si le nom du lieu est dans la clé
                 if valeur < distance_minimale: ## On regarde sa distance
                     distance_minimale = valeur
                     plus_proche = cle
@@ -65,8 +65,6 @@ class Graph:
         for i in range(len(ordre)-1):
             pos1 = ordre[i]
             pos2 = ordre[i+1]
-            if pos2 == 0:
-                continue
             if int(pos1) > int(pos2):
                 distance += self.matrice_od[f"{pos2}-{pos1}"]
             else:
@@ -77,8 +75,50 @@ class Graph:
 
 ############ Class Route ############
 class Route:
-    def __init__(self, ordre):
+    def __init__(self, ordre, distance, point_initial, graph):
         self.ordre = ordre
+        self.distance = distance
+        self.point_initial = point_initial
+        self.graph = graph
+
+    def recup_points_manquants(self, NB_LIEUX):
+        ## Fonction pour trouver les points non visités
+        points_manquants = []
+        for i in range(NB_LIEUX):
+            points_manquants.append(i)
+
+        for i in range(len(self.ordre)):
+            if self.ordre[i] in points_manquants:
+                del points_manquants[i]
+        
+        self.points_manquants = points_manquants
+
+    def heuristique_depart(self, NB_LIEUX):
+        ## Algo du plus proche voisin (optimisable)
+        self.recup_points_manquants(NB_LIEUX)
+        matrice_initial_od = self.graph.matrice_od.copy()
+        while (self.points_manquants != []):
+            point_depart = self.ordre[-1]
+            proche, distance = self.graph.plus_proche_voisin(str(point_depart))
+            self.ordre.append(int(proche))
+            self.distance += distance
+            self.points_manquants.remove(int(proche))
+
+            point_arrivé = self.ordre[-1]
+            if int(point_depart) < int(point_arrivé):
+                del self.graph.matrice_od[f"{point_depart}-{point_arrivé}"]
+            else:
+                del self.graph.matrice_od[f"{point_arrivé}-{point_depart}"]
+
+        self.ordre.append(0)
+        self.graph.matrice_od = matrice_initial_od.copy()
+        self.distance += self.graph.matrice_od[f"{self.ordre[-1]}-{self.ordre[-2]}"]
+        print(self.ordre)
+        print(self.distance)
+
+
+
+        
 
 
 ############ Class Affichage ############
