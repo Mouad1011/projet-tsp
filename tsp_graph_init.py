@@ -8,13 +8,12 @@ import csv
 
 LARGEUR = 800
 HAUTEUR = 600
-NB_LIEUX = 5
 NOM_GROUPE = "GROUPE_X" # A définir
 
 ######### Fonctions diverses ##########
 def nettoyer_cle(cle, recherche):
     ## Fonction qui retourne l'élement inverse à la recherche dans les chemins
-    elements = cle.slip("-")
+    elements = cle.split("-")
     return elements[1] if elements[0] == recherche else elements[0]
 
 ######### Classe Lieu #############
@@ -25,8 +24,9 @@ class Lieu:
         self.nom = nom
         
     def calcul_distance(Lieu1, Lieu2):
-        delta = np.array([Lieu1.x, Lieu1.y]) - np.array([Lieu2.x, Lieu2.y])
-        return np.sqrt(np.dot(delta, delta))
+        return float(np.hypot(Lieu1.x - Lieu2.x, Lieu1.y - Lieu2.y))
+        # delta = np.array([Lieu1.x, Lieu1.y]) - np.array([Lieu2.x, Lieu2.y])
+        # return np.sqrt(np.dot(delta, delta))
 
 ############ Class Graph ############
 class Graph:
@@ -38,8 +38,8 @@ class Graph:
         delta = 0 ## Delta permet d'éviter de relire les mêmes chemins
         for position1 in self.liste_lieux:
             delta += 1
-        for position2 in self.liste_lieux[delta:]: ## Pour la deuxième position, il faut prendre la position qui est à l'indice suivant (donc on supprime les delta-ème indice précédente)
-            matrice_od[f"{position1.nom}-{position2.nom}"] = Lieu.calcul_distance(position1, position2) ## Format : "1-2" : 5
+            for position2 in self.liste_lieux[delta:]: ## Pour la deuxième position, il faut prendre la position qui est à l'indice suivant (donc on supprime les delta-ème indice précédente)
+                matrice_od[f"{position1.nom}-{position2.nom}"] = Lieu.calcul_distance(position1, position2) ## Format : "1-2" : 5
 
         self.matrice_od = matrice_od
 
@@ -57,13 +57,12 @@ class Graph:
         plus_proche = nettoyer_cle(plus_proche, nom) 
         return plus_proche, distance_minimale       
 
-    def charger_graph(chemin_fichier):
-        with open(f'{chemin_fichier}/graph_.{NB_LIEUX}csv', 'r', encoding='utf-8') as fichier:
-            return csv.DictReader(fichier)
+    def charger_graph(chemin_fichier, NB_LIEUX):
+        return pd.read_csv(f'{chemin_fichier}/graph_{NB_LIEUX}.csv')
 
     def calcul_distance_route(self, ordre):
         distance = 0
-        for i in range(len(ordre)):
+        for i in range(len(ordre)-1):
             pos1 = ordre[i]
             pos2 = ordre[i+1]
             if pos2 == 0:
