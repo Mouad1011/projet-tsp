@@ -12,12 +12,6 @@ NOM_GROUPE = "GROUPE_X" # A définir
 NB_LIEUX = 20
 RAYON = 12
 
-######### Fonctions diverses ##########
-def nettoyer_cle(cle, recherche):
-    ## Fonction qui retourne l'élement inverse à la recherche dans les chemins
-    elements = cle.split("-")
-    return elements[1] if elements[0] == recherche else elements[0]
-
 ######### Classe Lieu #############
 class Lieu:
     def __init__(self, x, y, nom):
@@ -37,8 +31,18 @@ class Graph:
         self.matrice_od = None
         if fichier_csv is not None:
             self.charger_graph(fichier_csv) # lieux lus dans un CSV
+        else:
+            self.generer_lieux_aleatoires(nb_lieux) # lieux au hasard
         # On calcule toutes les distances UNE SEULE FOIS, ici.
         self.calcul_matrice_cout_od()
+
+    def generer_lieux_aleatoires(self, nb_lieux):
+        """Crée nb_lieux lieux au hasard, qui tiennent dans LARGEUR x HAUTEUR."""
+        self.liste_lieux = []
+        for i in range(nb_lieux):
+           x = random.uniform(RAYON, LARGEUR - RAYON) # on garde une marge pour
+           y = random.uniform(RAYON, HAUTEUR - RAYON) # que le cercle ne sorte pas
+           self.liste_lieux.append(Lieu(x, y, str(i)))
 
 
     def calcul_matrice_cout_od(self):
