@@ -9,6 +9,8 @@ import csv
 LARGEUR = 800
 HAUTEUR = 600
 NOM_GROUPE = "GROUPE_X" # A définir
+NB_LIEUX = 20
+RAYON = 12
 
 ######### Fonctions diverses ##########
 def nettoyer_cle(cle, recherche):
@@ -30,119 +32,195 @@ class Lieu:
 
 ############ Class Graph ############
 class Graph:
-    def __init__(self, liste_lieux):
-        self.liste_lieux = liste_lieux
-        
+    def __init__(self, fichier_csv=None, nb_lieux=NB_LIEUX):
+        self.liste_lieux = []
+        self.matrice_od = None
+        if fichier_csv is not None:
+            self.charger_graph(fichier_csv) # lieux lus dans un CSV
+        # On calcule toutes les distances UNE SEULE FOIS, ici.
+        self.calcul_matrice_cout_od()
+
+
     def calcul_matrice_cout_od(self):
-        matrice_od = {} ## Dans un dictionnaire pour faire l'association chemins - distance
-        delta = 0 ## Delta permet d'éviter de relire les mêmes chemins
-        for position1 in self.liste_lieux:
-            delta += 1
-            for position2 in self.liste_lieux[delta:]: ## Pour la deuxième position, il faut prendre la position qui est à l'indice suivant (donc on supprime les delta-ème indice précédente)
-                matrice_od[f"{position1.nom}-{position2.nom}"] = Lieu.calcul_distance(position1, position2) ## Format : "1-2" : 5
+        """Remplit matrice_od : matrice_od[i][j] = distance entre le lieu i et le lieu j."""
+        n = len(self.liste_lieux)
+        self.matrice_od = np.zeros((n, n))
+        for i in range(n):
+            for j in range(n):
+                self.matrice_od[i][j] = self.liste_lieux[i].calcul_distance(self.liste_lieux[j])
+        return self.matrice_od
 
-        self.matrice_od = matrice_od
+    def plus_proche_voisin(self, lieu, deja_visites):
+        """
+        Renvoie le numéro du lieu NON visité le plus proche de `lieu`,
+        en lisant la matrice des distances (aucun calcul de distance ici).
+        """
+        meilleur_voisin = None
+        meilleure_distance = float("inf") # "infini" au départ
 
-    def plus_proche_voisin(self, nom):
-        plus_proche = None
-        distance_minimale = float("inf")
+        for autre in range(len(self.liste_lieux)):
+            if autre == lieu or autre in deja_visites:
+                continue # on saute le lieu lui-même et les visités
+            distance = self.matrice_od[lieu][autre]
+            if distance < meilleure_distance:
+                meilleure_distance = distance
+                meilleur_voisin = autre
 
-        for cle, valeur in self.matrice_od.items():
-            noeud1, noeud2 = cle.split("-")
-            if (str(nom) == noeud1 or str(nom) == noeud2): ##s Si le nom du lieu est dans la clé
-                if valeur < distance_minimale: ## On regarde sa distance
-                    distance_minimale = valeur
-                    plus_proche = cle
+        return meilleur_voisin    
 
-        plus_proche = nettoyer_cle(plus_proche, nom) 
-        return plus_proche, distance_minimale       
+    def charger_graph(self, chemin_fichier):
+        """Lit un CSV avec une colonne x et une colonne y (une ligne = un lieu)."""
+        self.liste_lieux = []
+        with open(chemin_fichier, "r", encoding="utf-8") as fichier:
+            lecteur = csv.DictReader(fichier) # lit chaque ligne comme {"x": ..., "y": ...}
+            for numero, ligne in enumerate(lecteur):
+                self.liste_lieux.append(Lieu(ligne["x"], ligne["y"], str(numero)))
 
-    def charger_graph(chemin_fichier, NB_LIEUX):
-        return pd.read_csv(f'{chemin_fichier}/graph_{NB_LIEUX}.csv')
+    def calcul_distance_route(self, route):
+        """Coût d'une route = somme des distances de chaque étape."""
+        total = 0
+        for k in range(len(route.ordre) - 1):
+            depart = route.ordre[k]
+            arrivee = route.ordre[k + 1]
+            total += self.matrice_od[depart][arrivee]
 
-    def calcul_distance_route(self, ordre):
-        distance = 0
-        for i in range(len(ordre)-1):
-            pos1 = ordre[i]
-            pos2 = ordre[i+1]
-            if int(pos1) > int(pos2):
-                distance += self.matrice_od[f"{pos2}-{pos1}"]
-            else:
-                distance += self.matrice_od[f"{pos1}-{pos2}"]
-
-        return distance
+        return total
             
 
 ############ Class Route ############
 class Route:
-    def __init__(self, ordre, distance, point_initial, graph):
-        self.ordre = ordre
-        self.distance = distance
-        self.point_initial = point_initial
-        self.graph = graph
-
-    def recup_points_manquants(self, NB_LIEUX):
-        ## Fonction pour trouver les points non visités
-        points_manquants = []
-        for i in range(NB_LIEUX):
-            points_manquants.append(i)
-
-        for i in range(len(self.ordre)):
-            if self.ordre[i] in points_manquants:
-                del points_manquants[i]
+    """
+    Un trajet. ordre = liste des numéros de lieux visités,
+    qui commence ET finit par 0. Exemple : [0, 3, 1, 2, 0]
+    """
+    def __init__(self, ordre):
+        self.ordre = list(ordre)
+        self.distance = None # le coût, calculé par le Graph
         
-        self.points_manquants = points_manquants
+    @staticmethod
+    def depuis_plus_proche_voisin(graph):
+        """
+        HEURISTIQUE DE DÉPART : depuis où je suis, je vais toujours
+        au lieu non visité le plus proche. Donne une première route rapidement.
+        """
+        ordre = [0] # on part du lieu 0
+        deja_visites = {0}
+        lieu_actuel = 0
+        while len(ordre) < len(graph.liste_lieux):
+            suivant = graph.plus_proche_voisin(lieu_actuel, deja_visites)
+            ordre.append(suivant)
+            deja_visites.add(suivant)
+            lieu_actuel = suivant
 
-    def heuristique_depart(self, NB_LIEUX):
-        ## Algo du plus proche voisin (optimisable)
-        self.recup_points_manquants(NB_LIEUX)
-        matrice_initial_od = self.graph.matrice_od.copy()
-        while (self.points_manquants != []):
-            point_depart = self.ordre[-1]
-            proche, distance = self.graph.plus_proche_voisin(str(point_depart))
-            self.ordre.append(int(proche))
-            self.distance += distance
-            self.points_manquants.remove(int(proche))
+        ordre.append(0) # retour au point de départ
+        route = Route(ordre)
+        route.distance = graph.calcul_distance_route(route)
+        return route
 
-            point_arrivé = self.ordre[-1]
-            if int(point_depart) < int(point_arrivé):
-                del self.graph.matrice_od[f"{point_depart}-{point_arrivé}"]
-            else:
-                del self.graph.matrice_od[f"{point_arrivé}-{point_depart}"]
-
-        self.ordre.append(0)
-        self.graph.matrice_od = matrice_initial_od.copy()
-        self.distance += self.graph.matrice_od[f"{self.ordre[-1]}-{self.ordre[-2]}"]
-        print(self.ordre)
-        print(self.distance)
-
-
-
-        
+    def __repr__(self):
+        return f"Route(distance={self.distance:.2f}, ordre={self.ordre})"
 
 
 ############ Class Affichage ############
 class Affichage():
-    def __init__(self, largeur, hauteur):
-        self.hauteur = hauteur
-        self.largeur = largeur
-        self.fenetre = None
-        self.label = None
-        self.canvas = None
-
-    def creer_fenetre(self):
+    def __init__(self, graph, titre=""):
+        self.graph = graph
+        self.meilleur_route = None
+        self.autres_routes = []
+        self.pheromones = None
+        self.voir_pheromones = False
+        self.voir_autres_routes = False
         self.fenetre = Tk()
-        self.fenetre.title(NOM_GROUPE)
-        self.canvas = Canvas(self.fenetre, width=LARGEUR, height=HAUTEUR)
-        self.canvas.pack()
-        self.label = Label(self.fenetre, text="Texte par défaut")
-        self.label.pack()
+        self.fenetre.title(f"{NOM_GROUPE} - Voyageur de commerce {titre}")
+        self.zone_dessin = Canvas(self.fenetre, width=LARGEUR, height=HAUTEUR, bg="white")
+        self.zone_dessin.pack()
+        Label(self.fenetre, text="[P] phéromones [R] meilleures routes [Échap] quitter").pack()
+        self.zone_texte = Text(self.fenetre, height=6)
+        self.zone_texte.pack(fill="x")
+
+        self.fenetre.bind("<Escape>", lambda e: self.fenetre.destroy())
+        self.fenetre.bind("<KeyPress-p>", lambda e: self.basculer_pheromones())
+        self.fenetre.bind("<KeyPress-r>", lambda e: self.basculer_autres_routes())
+        self.dessiner()
+
+    def ecrire(self, message):
+        """Ajoute une ligne dans la zone de texte"""
+        self.zone_texte.insert("end", message + "\n")
+        self.zone_texte.see("end")
+
+    def mettre_a_jour(self, meilleure_route=None, autres_routes=None, pheromones=None, message=None):
+        """Les fourmis donnent leurs nouveaux résultats, on redissine toute."""
+        if meilleure_route is not None:
+            self.meilleur_route = meilleure_route
+        if autres_routes is not None:
+            self.autres_routes = autres_routes
+        if pheromones is not None:
+            self.pheromones = pheromones
+        if message:
+            self.ecrire(message)
+        self.dessiner()
+        self.fenetre.update()
+    
+    def lancer(self):
+        """Garde la fen^tre ouverte"""
         self.fenetre.mainloop()
 
-    def modifier_texte(self, nouveau_texte):
-        if self.label:
-            self.label.config(text=str(nouveau_texte))
+    def basculer_pheromones(self):
+        self.voir_pheromones = not self.voir_pheromones
+        self.dessiner()
 
-    ## TODO: Afficher et modifier le graphe
-    ## TODO: Gérer les colorimétries et nombre de phéromones
-    ## TODO: Gérer les différents affichages
+    def basculer_autres_routes(self):
+        self.voir_autres_routes = not self.voir_autres_routes
+        self.dessiner()
+
+    def dessiner(self):
+        self.zone_dessin.delete("all")
+        if self.voir_pheromones and self.pheromones is not None:
+            self.dessiner_pheromones()
+        if self.voir_autres_routes:
+            for route in self.autres_routes[:5]:
+                self.dessiner_route(route, couleur="lightgray", pointilles=None)
+        if self.meilleur_route is not None:
+            self.dessiner_route(self.meilleur_route, couleur="blue", pointilles=(6, 4))
+        self.dessiner_lieux()
+        if self.meilleur_route is not None:
+            self.dessiner_ordre_visite(self.meilleur_route)
+        
+    def dessiner_lieux(self):
+        """Chaque lieu = un cercle avec son numéro au milieu (le 0 en rouge)."""
+        for numero, lieu in enumerate(self.graph.liste_lieux):
+            couleur = "red" if numero == 0 else "yellow"
+            self.zone_dessin.create_oval(lieu.x - RAYON, lieu.y - RAYON, lieu.x + RAYON, lieu.y + RAYON, fill=couleur, outline="black")
+            self.zone_dessin.create_text(lieu.x, lieu.y, text=str(numero))
+
+    def dessiner_route(self, route, couleur, pointilles):
+        """Une ligne brisée qui passe par tous les lieux de la route, dans l'ordre."""
+        points = []
+        for numero in route.ordre:
+            lieu = self.graph.liste_lieux[numero]
+            points.append(lieu.x)
+            points.append(lieu.y)
+        if pointilles:
+            self.zone_dessin.create_line(points, fill=couleur, width=2, dash=pointilles)
+        else:
+            self.zone_dessin.create_line(points, fill=couleur, width=1)
+
+    def dessiner_ordre_visite(self, route):
+        """Écrit au-dessus de chaque lieu sa position de passage (0, 1, 2, ...)."""
+        for position, numero in enumerate(route.ordre[:-1]):
+            lieu = self.graph.liste_lieux[numero]
+            self.zone_dessin.create_text(lieu.x, lieu.y - RAYON - 8, text=str(position), fill="blue")
+    
+    def dessiner_pheromones(self):
+        """Chaque arête est dessinée d'autant plus épaisse qu'elle a de phéromones."""
+        n = len(self.graph.liste_lieux)
+        maximum = self.pheromones.max()
+        if maximum <= 0:
+            return
+        for i in range(n):
+            for j in range(i + 1, n):
+                force = self.pheromones[i][j] / maximum # entre 0 et 1
+                if force < 0.05:
+                    continue # on ne dessine pas les traces trop faibles
+                a, b = self.graph.liste_lieux[i], self.graph.liste_lieux[j]
+                self.zone_dessin.create_line(a.x, a.y, b.x, b.y, fill="orange", width=1 + 6 * force)
