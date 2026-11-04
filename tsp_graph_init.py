@@ -48,7 +48,8 @@ class Graph:
         distance_minimale = float("inf")
 
         for cle, valeur in self.matrice_od.items():
-            if nom in cle: ## Si le nom du lieu est dans la clé
+            noeud1, noeud2 = cle.split("-")
+            if str(nom) == noeud1 or str(nom) == noeud2: ## Si le nom du lieu est dans la clé
                 if valeur < distance_minimale: ## On regarde sa distance
                     distance_minimale = valeur
                     plus_proche = cle
