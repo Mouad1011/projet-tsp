@@ -2,11 +2,23 @@ from tsp_graph_init import Lieu, Graph, Route, Affichage
 import random
 import numpy as np
 from tkinter import TclError
+from concurrent.futures import ProcessPoolExecutor
+
+def _lot_de_fourmis(aco, nb, graine):
+    """Exécutée dans un processus séparé : fait travailler `nb` fourmis."""
+    random.seed(graine)  # indispensable, sinon tous les processus tirent les mêmes routes
+    routes = []
+    for _ in range(nb):
+        route = aco.construire_route()
+        if aco.utiliser_2opt:
+            route = aco.deux_opt(route)
+        routes.append(route)
+    return routes
 
 # Classe TSP_ACO : à venir
 class TSP_ACO:
     def __init__(self, graph, nb_fourmis=20, alpha=1.0, beta=3.0, evaporation=0.1, poids_elite=5,
-                 utiliser_2opt=True):
+                 utiliser_2opt=True, nb_processus=4):
         self.graph = graph
         self.n = len(graph.liste_lieux)
         self.nb_fourmis = nb_fourmis          # nombre de fourmis par itération
@@ -23,6 +35,9 @@ class TSP_ACO:
         self.meilleure_route = Route.depuis_plus_proche_voisin(graph)
         self.longueur_reference = self.meilleure_route.distance  # sert d'échelle pour les dépôts
         self.iteration_meilleure = 0
+
+        self.nb_processus = nb_processus
+        self.pool = ProcessPoolExecutor(max_workers=nb_processus)
  
     # ------------------------------------------------------------------
     # Étape 2 : une fourmi construit une route
@@ -109,12 +124,12 @@ class TSP_ACO:
  
     def iteration(self):
         """Une itération : toutes les fourmis font leur tour, puis mise à jour des phéromones."""
-        routes = []
-        for _ in range(self.nb_fourmis):
-            route = self.construire_route()
-            if self.utiliser_2opt:
-                route = self.deux_opt(route)  # on "nettoie" la route de la fourmi
-            routes.append(route)
+        base, reste = divmod(self.nb_fourmis, self.nb_processus)
+        tailles = [base + (1 if k < reste else 0) for k in range(self.nb_processus)]
+        graines = [random.getrandbits(32) for _ in tailles]
+
+        lots = self.pool.map(_lot_de_fourmis, [self] * self.nb_processus, tailles, graines)
+        routes = [r for lot in lots for r in lot]
  
         # On met à jour les phéromones avec les routes de ce tour
         self.mettre_a_jour_pheromones(routes)
@@ -135,6 +150,7 @@ class TSP_ACO:
                 print(f"Itération {it:3d} : nouvelle meilleure route = {self.meilleure_route.distance:.2f}")
         print(f"Fin : meilleure distance = {self.meilleure_route.distance:.2f} "
               f"(trouvée à l'itération {self.iteration_meilleure})")
+        self.pool.shutdown()
         return self.meilleure_route
  
     # ------------------------------------------------------------------
@@ -169,5 +185,10 @@ class TSP_ACO:
         affichage.fenetre.after(delai_ms, une_etape)  # première itération dans delai_ms
         affichage.lancer()  # la fenêtre reste ouverte (Échap pour quitter)
         return self.meilleure_route
+
+    def __getstate__(self):
+        etat = self.__dict__.copy()
+        etat["pool"] = None
+        return etat
     
     
