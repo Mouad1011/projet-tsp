@@ -241,7 +241,21 @@ class TSP_ACO:
         affichage.mettre_a_jour(meilleure_route=self.meilleure_route, pheromones=self.pheromones,
                                 message=f"{self.n} lieux | départ : {self.meilleure_route.distance:.2f}")
 
+        def quand_pause(en_pause):
+            """Appelée par la fenêtre à chaque appui sur Espace."""
+            if en_pause:
+                affichage.ecrire(f"PAUSE | meilleure distance : {self.meilleure_route.distance:.2f}")
+                if self.n <= 60:
+                    affichage.ecrire(f"Ordre de visite : {self.meilleure_route.ordre}")
+            else:
+                affichage.ecrire("REPRISE")
+
+        affichage.quand_pause = quand_pause
+
         def une_etape():
+            if affichage.en_pause:  # en pause : on ne calcule rien, on revérifie un peu plus tard
+                affichage.fenetre.after(delai_ms, une_etape)
+                return
             self.numero_iteration += 1
             routes, amelioration = self.iteration()
             if amelioration:
